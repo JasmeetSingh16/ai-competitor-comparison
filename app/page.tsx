@@ -66,7 +66,7 @@ export default function Home() {
     setResult(null);
 
     try {
-      const response = await fetch("/api/compare", {
+      const response = await fetch("/ai-competitor-comparison/api/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ business, competitor, industry }),
