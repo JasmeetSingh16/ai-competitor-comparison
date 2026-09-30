@@ -4,7 +4,7 @@ import { ArrowRight, Lightbulb, Quote, RotateCcw, Sparkles, TriangleAlert } from
 import { FormEvent, useRef, useState } from "react";
 import { EmptyPreview, WorkspaceSection } from "../components/agent/AgentTemplate";
 import { CopyButton, LoadingSteps } from "../components/agent/AgentUi";
-import ReportGate, { ReportCta } from "../components/agent/ReportGate";
+import ReportGate, { GoogleReturn, ReportCta } from "../components/agent/ReportGate";
 import type { ReportGateInfo } from "../lib/lead-gate";
 import { exampleComparison, sampleMatchups, type ComparisonResult } from "./compare-data";
 import { inputOf, previewOf, summaryOf } from "./report-gate";
@@ -168,6 +168,23 @@ export default function CompetitorCompare() {
       <p className="jk-sr" role="status">
         {result && !loading ? "Comparison ready." : ""}
       </p>
+
+      {/* Back from "Continue with Google": unlock the saved report. */}
+
+      <GoogleReturn
+
+        agent="competitor-comparison"
+
+        onFull={(full) => {
+
+          setResult(full as ComparisonResult);
+
+          setGate(null);
+
+        }}
+
+      />
+
 
       <div ref={outputRef} className="cc-output">
         {loading ? (
