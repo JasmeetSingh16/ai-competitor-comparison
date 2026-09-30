@@ -7,9 +7,14 @@ import { CopyButton, LoadingSteps } from "../components/agent/AgentUi";
 import ReportGate, { ReportCta } from "../components/agent/ReportGate";
 import type { ReportGateInfo } from "../lib/lead-gate";
 import { exampleComparison, sampleMatchups, type ComparisonResult } from "./compare-data";
-import { PREVIEW_ROWS, inputOf, previewOf, summaryOf } from "./report-gate";
+import { inputOf, previewOf, summaryOf } from "./report-gate";
 
-const LOADING_STEPS = ["Reading both brands", "Comparing positioning", "Weighing strengths & gaps", "Writing your positioning"];
+const LOADING_STEPS = [
+  "Reading both brands",
+  "Comparing positioning",
+  "Weighing strengths & gaps",
+  "Writing your positioning",
+];
 
 export default function CompetitorCompare() {
   const [business, setBusiness] = useState("");
@@ -218,8 +223,7 @@ function initials(name: string) {
 
 /**
  * part: "all" = the full comparison; "preview" = before the email form
- * (plates, key insight, first rows); "locked" = the remaining rows and the
- * recommended positioning.
+ * (just the two names); "locked" = everything else, blurred behind the form.
  */
 function VersusBoard({
   result,
@@ -230,15 +234,14 @@ function VersusBoard({
   onReset?: () => void;
   part?: "all" | "preview" | "locked";
 }) {
-  const rows = part === "locked" ? result.rows.slice(PREVIEW_ROWS) : result.rows;
-
   const asText = [
     `${result.business} vs ${result.competitor}`,
     "",
     `Key insight: ${result.key_insight}`,
     "",
     ...result.rows.map(
-      (r) => `${r.category}\n  ${result.business}: ${r.business_analysis}\n  ${result.competitor}: ${r.competitor_analysis}`,
+      (r) =>
+        `${r.category}\n  ${result.business}: ${r.business_analysis}\n  ${result.competitor}: ${r.competitor_analysis}`,
     ),
     "",
     `Recommended positioning: ${result.recommended_positioning}`,
@@ -281,7 +284,11 @@ function VersusBoard({
               </div>
             </div>
           </div>
+        </>
+      )}
 
+      {part !== "preview" && (
+        <>
           <section className="cc-insight" aria-label="Key competitive insight">
             <Lightbulb size={20} aria-hidden="true" />
             <div>
@@ -293,21 +300,23 @@ function VersusBoard({
       )}
 
       {/* Rows */}
-      <ol className="cc-rows">
-        {rows.map((row) => (
-          <li key={row.category} className="cc-row">
-            <p className="cc-cat">{row.category}</p>
-            <div className="cc-cell cc-cell--you">
-              <p className="cc-cell-who">{result.business}</p>
-              <p>{row.business_analysis}</p>
-            </div>
-            <div className="cc-cell cc-cell--them">
-              <p className="cc-cell-who">{result.competitor}</p>
-              <p>{row.competitor_analysis}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+      {part !== "preview" && (
+        <ol className="cc-rows">
+          {result.rows.map((row) => (
+            <li key={row.category} className="cc-row">
+              <p className="cc-cat">{row.category}</p>
+              <div className="cc-cell cc-cell--you">
+                <p className="cc-cell-who">{result.business}</p>
+                <p>{row.business_analysis}</p>
+              </div>
+              <div className="cc-cell cc-cell--them">
+                <p className="cc-cell-who">{result.competitor}</p>
+                <p>{row.competitor_analysis}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
 
       {part !== "preview" && (
         <section className="cc-position" aria-label="Recommended positioning">

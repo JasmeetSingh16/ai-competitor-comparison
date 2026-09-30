@@ -6,12 +6,9 @@
 
 import type { ComparisonResult } from "./compare-data";
 
-/** Comparison rows shown in the preview. */
-export const PREVIEW_ROWS = 3;
-
-/** Key insight plus the first three comparison rows. */
+/** Only the two names the visitor entered — the whole comparison is locked. */
 export function previewOf(result: ComparisonResult): ComparisonResult {
-  return { ...result, rows: result.rows.slice(0, PREVIEW_ROWS), recommended_positioning: "" };
+  return { ...result, key_insight: "", rows: [], recommended_positioning: "" };
 }
 
 export function inputOf({ business, competitor, industry }: { business: string; competitor: string; industry?: string }) {
