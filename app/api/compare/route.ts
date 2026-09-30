@@ -1,5 +1,8 @@
 import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
+import { gateReport } from "../../../lib/report-gate";
+import type { ComparisonResult } from "../../compare-data";
+import { inputOf, previewOf, summaryOf } from "../../report-gate";
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -366,9 +369,22 @@ Provide:
       );
     }
 
-    const result = JSON.parse(content);
+    const parsed = JSON.parse(content) as ComparisonResult;
+    const result: ComparisonResult = {
+      ...parsed,
+      rows: Array.isArray(parsed.rows) ? parsed.rows : [],
+    };
 
-    return NextResponse.json(result);
+    // Preview + sealed full comparison (see lib/report-gate.ts).
+    return NextResponse.json(
+      gateReport({
+        agent: "competitor-comparison",
+        input: inputOf({ business, competitor, industry }),
+        summary: summaryOf(result),
+        full: result,
+        preview: previewOf(result),
+      })
+    );
 
   } catch (error) {
     console.error(

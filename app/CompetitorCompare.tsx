@@ -4,7 +4,10 @@ import { ArrowRight, Lightbulb, Quote, RotateCcw, Sparkles, TriangleAlert } from
 import { FormEvent, useRef, useState } from "react";
 import { EmptyPreview, WorkspaceSection } from "../components/agent/AgentTemplate";
 import { CopyButton, LoadingSteps } from "../components/agent/AgentUi";
+import ReportGate, { ReportCta } from "../components/agent/ReportGate";
+import type { ReportGateInfo } from "../lib/lead-gate";
 import { exampleComparison, sampleMatchups, type ComparisonResult } from "./compare-data";
+import { PREVIEW_ROWS, inputOf, previewOf, summaryOf } from "./report-gate";
 
 const LOADING_STEPS = ["Reading both brands", "Comparing positioning", "Weighing strengths & gaps", "Writing your positioning"];
 
@@ -13,6 +16,10 @@ export default function CompetitorCompare() {
   const [competitor, setCompetitor] = useState("");
   const [industry, setIndustry] = useState("");
   const [result, setResult] = useState<ComparisonResult | null>(null);
+  // Set while the full comparison is locked behind the email form.
+  const [gate, setGate] = useState<ReportGateInfo | null>(null);
+  // What was compared (the fields stay editable afterwards).
+  const [submitted, setSubmitted] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [sampleIndex, setSampleIndex] = useState(-1);
@@ -31,6 +38,7 @@ export default function CompetitorCompare() {
     setLoading(true);
     setError("");
     setResult(null);
+    setGate(null);
     outputRef.current?.scrollIntoView({ block: "start" });
 
     try {
@@ -46,7 +54,10 @@ export default function CompetitorCompare() {
         throw new Error(data.error || "Something went wrong.");
       }
 
-      setResult(data);
+      const { gate: gateInfo, ...report } = data as ComparisonResult & { gate?: ReportGateInfo | null };
+      setResult(report);
+      setGate(gateInfo ?? null);
+      setSubmitted(inputOf({ business, competitor, industry }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate comparison.");
       formRef.current?.scrollIntoView({ block: "start" });
@@ -67,6 +78,7 @@ export default function CompetitorCompare() {
 
   function resetComparison() {
     setResult(null);
+    setGate(null);
     setError("");
     setBusiness("");
     setCompetitor("");
@@ -158,7 +170,30 @@ export default function CompetitorCompare() {
             <LoadingSteps steps={LOADING_STEPS} interval={900} />
           </div>
         ) : result ? (
-          <VersusBoard result={result} onReset={resetComparison} />
+          <>
+            <VersusBoard
+              result={gate ? previewOf(result) : result}
+              onReset={resetComparison}
+              part={gate ? "preview" : "all"}
+            />
+            {gate ? (
+              <ReportGate
+                agent="competitor-comparison"
+                gate={gate}
+                input={submitted}
+                summary={summaryOf(result)}
+                onUnlock={(full) => {
+                  if (full) setResult(full as ComparisonResult);
+                  setGate(null);
+                }}
+              >
+                {/* Sealed comparisons aren't in the page yet: blur the example's rows instead. */}
+                <VersusBoard result={gate.token ? exampleComparison : result} part="locked" />
+              </ReportGate>
+            ) : (
+              <ReportCta />
+            )}
+          </>
         ) : (
           <EmptyPreview
             title="Your head-to-head appears here"
@@ -181,7 +216,22 @@ function initials(name: string) {
   return clean.slice(0, 1).toUpperCase() || "?";
 }
 
-function VersusBoard({ result, onReset }: { result: ComparisonResult; onReset?: () => void }) {
+/**
+ * part: "all" = the full comparison; "preview" = before the email form
+ * (plates, key insight, first rows); "locked" = the remaining rows and the
+ * recommended positioning.
+ */
+function VersusBoard({
+  result,
+  onReset,
+  part = "all",
+}: {
+  result: ComparisonResult;
+  onReset?: () => void;
+  part?: "all" | "preview" | "locked";
+}) {
+  const rows = part === "locked" ? result.rows.slice(PREVIEW_ROWS) : result.rows;
+
   const asText = [
     `${result.business} vs ${result.competitor}`,
     "",
@@ -196,51 +246,55 @@ function VersusBoard({ result, onReset }: { result: ComparisonResult; onReset?: 
 
   return (
     <article aria-label={`${result.business} versus ${result.competitor}`}>
-      <header className="cc-report-head">
-        <p className="jk-eyebrow">Head-to-head</p>
-        {onReset && (
-          <div className="flex flex-wrap gap-2">
-            <CopyButton text={asText} label="Copy comparison" />
-            <button type="button" className="jk-copy" onClick={onReset}>
-              <RotateCcw size={15} aria-hidden="true" />
-              Compare another
-            </button>
-          </div>
-        )}
-      </header>
+      {part !== "locked" && (
+        <>
+          <header className="cc-report-head">
+            <p className="jk-eyebrow">Head-to-head</p>
+            {onReset && (
+              <div className="flex flex-wrap gap-2">
+                {part === "all" && <CopyButton text={asText} label="Copy comparison" />}
+                <button type="button" className="jk-copy" onClick={onReset}>
+                  <RotateCcw size={15} aria-hidden="true" />
+                  Compare another
+                </button>
+              </div>
+            )}
+          </header>
 
-      {/* Title plates */}
-      <div className="cc-plates">
-        <div className="cc-plate cc-plate--you">
-          <span className="cc-mark">{initials(result.business)}</span>
-          <div className="min-w-0">
-            <p className="cc-plate-role">You</p>
-            <h3 className="cc-plate-name">{result.business}</h3>
+          {/* Title plates */}
+          <div className="cc-plates">
+            <div className="cc-plate cc-plate--you">
+              <span className="cc-mark">{initials(result.business)}</span>
+              <div className="min-w-0">
+                <p className="cc-plate-role">You</p>
+                <h3 className="cc-plate-name">{result.business}</h3>
+              </div>
+            </div>
+            <span className="cc-vs cc-vs--lg" aria-hidden="true">
+              VS
+            </span>
+            <div className="cc-plate cc-plate--them">
+              <span className="cc-mark">{initials(result.competitor)}</span>
+              <div className="min-w-0">
+                <p className="cc-plate-role">Competitor</p>
+                <h3 className="cc-plate-name">{result.competitor}</h3>
+              </div>
+            </div>
           </div>
-        </div>
-        <span className="cc-vs cc-vs--lg" aria-hidden="true">
-          VS
-        </span>
-        <div className="cc-plate cc-plate--them">
-          <span className="cc-mark">{initials(result.competitor)}</span>
-          <div className="min-w-0">
-            <p className="cc-plate-role">Competitor</p>
-            <h3 className="cc-plate-name">{result.competitor}</h3>
-          </div>
-        </div>
-      </div>
 
-      <section className="cc-insight" aria-label="Key competitive insight">
-        <Lightbulb size={20} aria-hidden="true" />
-        <div>
-          <p className="cc-insight-label">Key insight</p>
-          <p className="mt-1 text-[16px] leading-7">{result.key_insight}</p>
-        </div>
-      </section>
+          <section className="cc-insight" aria-label="Key competitive insight">
+            <Lightbulb size={20} aria-hidden="true" />
+            <div>
+              <p className="cc-insight-label">Key insight</p>
+              <p className="mt-1 text-[16px] leading-7">{result.key_insight}</p>
+            </div>
+          </section>
+        </>
+      )}
 
       {/* Rows */}
       <ol className="cc-rows">
-        {result.rows.map((row) => (
+        {rows.map((row) => (
           <li key={row.category} className="cc-row">
             <p className="cc-cat">{row.category}</p>
             <div className="cc-cell cc-cell--you">
@@ -255,22 +309,26 @@ function VersusBoard({ result, onReset }: { result: ComparisonResult; onReset?: 
         ))}
       </ol>
 
-      <section className="cc-position" aria-label="Recommended positioning">
-        <Quote size={26} aria-hidden="true" />
-        <div>
-          <p className="cc-position-label">Recommended positioning for {result.business}</p>
-          <p className="cc-position-text">{result.recommended_positioning}</p>
-          {onReset && (
-            <div className="mt-4">
-              <CopyButton text={result.recommended_positioning} label="Copy positioning" />
-            </div>
-          )}
-        </div>
-      </section>
+      {part !== "preview" && (
+        <section className="cc-position" aria-label="Recommended positioning">
+          <Quote size={26} aria-hidden="true" />
+          <div>
+            <p className="cc-position-label">Recommended positioning for {result.business}</p>
+            <p className="cc-position-text">{result.recommended_positioning}</p>
+            {onReset && (
+              <div className="mt-4">
+                <CopyButton text={result.recommended_positioning} label="Copy positioning" />
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
-      <p className="jk-fineprint mx-auto mt-6 max-w-2xl text-center">
-        AI-generated insights are for strategic exploration and may not reflect the latest company information.
-      </p>
+      {part === "all" && (
+        <p className="jk-fineprint mx-auto mt-6 max-w-2xl text-center">
+          AI-generated insights are for strategic exploration and may not reflect the latest company information.
+        </p>
+      )}
     </article>
   );
 }
